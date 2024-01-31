@@ -1,3 +1,6 @@
+const Message = require("../models/messaje");
+const User = require('../models/user');
+
 module.exports = (io) => {
   io.on("connection", (socket) => {
     // Cuando un usuario se une a una clase
@@ -22,15 +25,24 @@ module.exports = (io) => {
       });
 
       // Guarda el mensaje en la base de datos
-      newMessage.save((err, savedMessage) => {
-        if (err) {
+      newMessage
+        .save()
+        .then((savedMessage) => {
+          // Busca el usuario por senderId
+          return User.findById(savedMessage.senderId).then(user => {
+            // Añade el nombre del usuario al mensaje
+            const messageToSend = {
+              ...savedMessage.toObject(),
+              senderId: user.fullName, // o la propiedad que contenga el nombre del usuario
+            };
+            // Emite el mensaje a la sala
+            io.to(`class-${savedMessage.classId}`).emit("message", messageToSend);
+          });
+        })
+        .catch((err) => {
           // Maneja el error como consideres apropiado
           console.error("Error al guardar el mensaje", err);
-        } else {
-          // Si el mensaje se guardó correctamente, emite el mensaje a la sala
-          io.to(`class-${savedMessage.classId}`).emit("message", savedMessage);
-        }
-      });
+        });
     });
 
     socket.on("disconnect", () => {
